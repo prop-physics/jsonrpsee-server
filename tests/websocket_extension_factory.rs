@@ -68,6 +68,15 @@ fn upgrade_request() -> HttpRequest {
 		.unwrap()
 }
 
+fn http_request() -> HttpRequest {
+	HttpRequest::builder()
+		.method("POST")
+		.header("host", "localhost")
+		.header("content-type", "application/json")
+		.body(HttpBody::from(r#"{"jsonrpc":"2.0","id":1,"method":"missing","params":[]}"#))
+		.unwrap()
+}
+
 #[tokio::test]
 async fn tower_service_instantiates_extensions_per_connection() {
 	let calls = Arc::new(AtomicUsize::new(0));
@@ -77,11 +86,27 @@ async fn tower_service_instantiates_extensions_per_connection() {
 		.to_service_builder()
 		.build(Methods::new(), stop_handle);
 
-	let response = service.call(upgrade_request()).await.unwrap();
+	for expected_calls in 1..=2 {
+		let response = service.call(upgrade_request()).await.unwrap();
+		assert_eq!(response.status(), http::StatusCode::SWITCHING_PROTOCOLS);
+		assert_eq!(response.headers()["sec-websocket-extensions"], "test-extension");
+		assert_eq!(calls.load(Ordering::SeqCst), expected_calls);
+	}
+}
 
-	assert_eq!(response.status(), http::StatusCode::SWITCHING_PROTOCOLS);
-	assert_eq!(response.headers()["sec-websocket-extensions"], "test-extension");
-	assert_eq!(calls.load(Ordering::SeqCst), 1);
+#[tokio::test]
+async fn tower_service_skips_extension_factory_for_http_requests() {
+	let calls = Arc::new(AtomicUsize::new(0));
+	let (stop_handle, _server_handle) = stop_channel();
+	let mut service = Server::builder()
+		.set_ws_extension_factory(CountingFactory(calls.clone()))
+		.to_service_builder()
+		.build(Methods::new(), stop_handle);
+
+	let response = service.call(http_request()).await.unwrap();
+
+	assert_eq!(response.status(), http::StatusCode::OK);
+	assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
