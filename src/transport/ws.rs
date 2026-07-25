@@ -432,6 +432,11 @@ where
 	for<'a> <L as tower::Layer<RpcService>>::Service: RpcServiceT<'a>,
 {
 	let mut server = soketto::handshake::http::Server::new();
+	if let Some(factory) = &server_cfg.ws_extension_factory {
+		for extension in factory.create() {
+			server.add_extension(extension);
+		}
+	}
 
 	match server.receive_request(&req) {
 		Ok(response) => {

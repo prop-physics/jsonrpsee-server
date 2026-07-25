@@ -70,6 +70,15 @@ type Notif<'a> = Notification<'a, Option<&'a JsonRawValue>>;
 /// Default maximum connections allowed.
 const MAX_CONNECTIONS: u32 = 100;
 
+/// Factory for WebSocket extensions installed on each accepted connection.
+///
+/// A fresh extension instance must be returned for every connection because
+/// extension negotiation and frame processing are connection-local.
+pub trait WsExtensionFactory: std::fmt::Debug + Send + Sync {
+	/// Create the extensions offered by the server for one connection.
+	fn create(&self) -> Vec<Box<dyn soketto::extension::Extension + Send>>;
+}
+
 /// JSON RPC server.
 pub struct Server<HttpMiddleware = Identity, RpcMiddleware = Identity> {
 	listener: TcpListener,
@@ -201,6 +210,8 @@ pub struct ServerConfig {
 	pub(crate) id_provider: Arc<dyn IdProvider>,
 	/// `TCP_NODELAY` settings.
 	pub(crate) tcp_no_delay: bool,
+	/// WebSocket extensions instantiated for each connection.
+	pub(crate) ws_extension_factory: Option<Arc<dyn WsExtensionFactory>>,
 }
 
 #[derive(Debug, Clone)]
@@ -350,6 +361,7 @@ impl Default for ServerConfig {
 			ping_config: None,
 			id_provider: Arc::new(RandomIntegerIdProvider),
 			tcp_no_delay: true,
+			ws_extension_factory: None,
 		}
 	}
 }
@@ -358,6 +370,12 @@ impl ServerConfig {
 	/// Create a new builder for the [`ServerConfig`].
 	pub fn builder() -> ServerConfigBuilder {
 		ServerConfigBuilder::default()
+	}
+
+	/// Install a factory that creates WebSocket extensions for each connection.
+	pub fn set_ws_extension_factory<F: WsExtensionFactory + 'static>(mut self, factory: F) -> Self {
+		self.ws_extension_factory = Some(Arc::new(factory));
+		self
 	}
 }
 
@@ -697,6 +715,12 @@ impl<HttpMiddleware, RpcMiddleware> Builder<HttpMiddleware, RpcMiddleware> {
 	///
 	pub fn set_id_provider<I: IdProvider + 'static>(mut self, id_provider: I) -> Self {
 		self.server_cfg.id_provider = Arc::new(id_provider);
+		self
+	}
+
+	/// Install a factory that creates WebSocket extensions for each connection.
+	pub fn set_ws_extension_factory<F: WsExtensionFactory + 'static>(mut self, factory: F) -> Self {
+		self.server_cfg.ws_extension_factory = Some(Arc::new(factory));
 		self
 	}
 
@@ -1059,6 +1083,11 @@ where
 			let this = self.inner.clone();
 
 			let mut server = soketto::handshake::http::Server::new();
+			if let Some(factory) = &this.server_cfg.ws_extension_factory {
+				for extension in factory.create() {
+					server.add_extension(extension);
+				}
+			}
 
 			let response = match server.receive_request(&request) {
 				Ok(response) => {

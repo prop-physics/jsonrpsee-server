@@ -1,44 +1,56 @@
 [package]
 name = "jsonrpsee-server"
+version = "0.23.2"
+edition = "2021"
+rust-version = "1.74.1"
+authors = [
+	"Parity Technologies <admin@parity.io>",
+	"Pierre Krieger <pierre.krieger1708@gmail.com>",
+]
 description = "JSON-RPC server that supports HTTP and WebSocket transports"
-version.workspace = true
-authors.workspace = true
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
-repository.workspace = true
-documentation.workspace = true
-homepage.workspace = true
-keywords.workspace = true
-readme.workspace = true
-publish = true
+homepage = "https://www.parity.io/"
+documentation = "https://docs.rs/jsonrpsee"
+readme = "README.md"
+keywords = ["jsonrpc", "json", "http", "websocket", "WASM"]
+license = "MIT"
+repository = "https://github.com/prop-physics/jsonrpsee-server"
+publish = false
+autotests = false
+
+# The upstream package's internal unit tests depend on sibling workspace crates.
+# This standalone subtree runs its focused public-API integration test instead.
+[lib]
+test = false
+
+[[test]]
+name = "websocket_extension_factory"
+path = "tests/websocket_extension_factory.rs"
 
 [dependencies]
 anyhow = "1"
 futures-util = { version = "0.3.14", default-features = false, features = ["io", "async-await-macro"] }
-jsonrpsee-types = { workspace = true }
-jsonrpsee-core = { workspace = true, features = ["server", "http-helpers"] }
-tracing = "0.1.34"
-serde = "1"
-serde_json = { version = "1", features = ["raw_value"] }
-soketto = { version = "0.8", features = ["http"] }
-tokio = { version = "1.23.1", features = ["net", "rt-multi-thread", "macros", "time"] }
-tokio-util = { version = "0.7", features = ["compat"] }
-tokio-stream = { version = "0.1.7", features = ["sync"] }
-hyper = { version = "1.3", features = ["server", "http1", "http2"] }
-hyper-util = { version = "0.1", features = ["tokio", "service", "tokio", "server-auto"] }
 http = "1"
 http-body = "1"
 http-body-util = "0.1.0"
-tower = "0.4.13"
-thiserror = "1"
-route-recognizer = "0.3.1"
+hyper = { version = "1.3", features = ["server", "http1", "http2"] }
+hyper-util = { version = "0.1", features = ["tokio", "service", "server-auto"] }
+jsonrpsee-core = { version = "0.23.2", features = ["server", "http-helpers"] }
+jsonrpsee-types = "0.23.2"
 pin-project = "1.1.3"
+route-recognizer = "0.3.1"
+serde = "1"
+serde_json = { version = "1", features = ["raw_value"] }
+soketto = { version = "0.8", features = ["http"] }
+thiserror = "1"
+tokio = { version = "1.23.1", features = ["net", "rt-multi-thread", "macros", "time"] }
+tokio-stream = { version = "0.1.7", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tower = { version = "0.4.13", features = ["util"] }
+tracing = "0.1.34"
 
 [dev-dependencies]
 anyhow = "1"
-jsonrpsee-test-utils = { path = "../test-utils" }
 rand = "0.8"
-tracing-subscriber = { version = "0.3.3", features = ["env-filter"] }
-tower = { version = "0.4.13", features = ["timeout"] }
 socket2 = "0.5.1"
+tower = { version = "0.4.13", features = ["timeout", "util"] }
+tracing-subscriber = { version = "0.3.3", features = ["env-filter"] }
