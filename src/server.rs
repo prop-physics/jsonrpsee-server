@@ -1154,7 +1154,7 @@ where
 						.in_current_span(),
 					);
 
-					response.map(|()| HttpBody::empty())
+					ws::strip_empty_extensions_header(response.map(|()| HttpBody::empty()))
 				}
 				Err(e) => {
 					tracing::debug!(target: LOG_TARGET, "Could not upgrade connection: {}", e);

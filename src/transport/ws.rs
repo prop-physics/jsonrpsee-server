@@ -419,6 +419,20 @@ async fn graceful_shutdown<S>(
 ///   }
 /// }
 /// ```
+/// soketto emits `Sec-WebSocket-Extensions` whenever an extension is
+/// registered, even when none was negotiated, which leaves an empty header
+/// that strict clients reject as an un-offered extension.
+pub(crate) fn strip_empty_extensions_header(mut response: HttpResponse) -> HttpResponse {
+	if response
+		.headers()
+		.get(http::header::SEC_WEBSOCKET_EXTENSIONS)
+		.is_some_and(|value| value.as_bytes().iter().all(u8::is_ascii_whitespace))
+	{
+		response.headers_mut().remove(http::header::SEC_WEBSOCKET_EXTENSIONS);
+	}
+	response
+}
+
 pub async fn connect<L, B>(
 	req: HttpRequest<B>,
 	server_cfg: ServerConfig,
@@ -500,7 +514,7 @@ where
 				background_task(params).await;
 			};
 
-			Ok((response.map(|()| HttpBody::default()), fut))
+			Ok((strip_empty_extensions_header(response.map(|()| HttpBody::default())), fut))
 		}
 		Err(e) => {
 			tracing::debug!(target: LOG_TARGET, "WS upgrade handshake failed: {}", e);
