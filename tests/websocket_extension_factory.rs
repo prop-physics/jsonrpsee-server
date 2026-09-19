@@ -127,3 +127,22 @@ async fn low_level_connect_instantiates_extensions_per_connection() {
 	assert_eq!(response.headers()["sec-websocket-extensions"], "test-extension");
 	assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
+
+#[tokio::test]
+async fn handshake_without_offered_extensions_omits_the_extensions_header() {
+	let (stop_handle, _server_handle) = stop_channel();
+	let mut service = Server::builder()
+		.set_ws_extension_factory(CountingFactory(Arc::new(AtomicUsize::new(0))))
+		.to_service_builder()
+		.build(Methods::new(), stop_handle);
+
+	let mut request = upgrade_request();
+	request.headers_mut().remove("sec-websocket-extensions");
+	let response = service.call(request).await.unwrap();
+
+	assert_eq!(response.status(), http::StatusCode::SWITCHING_PROTOCOLS);
+	assert!(
+		response.headers().get("sec-websocket-extensions").is_none(),
+		"no extension was negotiated, so strict clients must not see the header"
+	);
+}
